@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 20;
+use Test::More tests => 36;
 use Mac::Safari::JavaScript qw(safari_js);
 use Scalar::Util qw(blessed);
 use Data::Dumper;
@@ -84,23 +84,65 @@ like ($@, qr/Uneven number of parameters passed to safari_js/, "Uneven number of
 ########################################################################
 
 # testing exceptions
-sub error_like (&$$) {
+sub error_check (&$$) {
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   my $uboat = shift;
-  my $re = shift;
+  my $type = shift;
   my $description = shift;
   eval { $uboat->() };
-  unless (defined($@) && blessed($@) && $@->isa("Mac::JavaScript::Safari::Exception") && "$@" =~ $re) {
+  my $error = $@;
+  if ($error && blessed($error) && $error->isa("Mac::Safari::JavaScript::Exception") && $error->name eq $type) {
     ok(1, $description);
-    return 0;
+    return $error;
   }
-  return ok(1, $description);
+  ok(0, $description);
+  diag("Error class is @{[ ref $error ]})");
+  diag("Error is $error");
+  return $error;
 }
 
-error_like {
-  safari_js "++++";
-} qr/Parse error/, "invalid js";
+my $error;
 
-error_like {
+$error = error_check {
+  safari_js "throw 'Bang'";
+} "CustomError", "string error";
+is($error, "Bang","...stringifies to that error");
+
+$error = error_check {
+  safari_js "throw ''";
+} "CustomError", "empty error";
+ok($error, "...is still a true error");
+is($error, "", "...stringifies to the empty string");
+
+$error = error_check { safari_js <<'ENDOFJAVASCRIPT'; } "CustomError", "object error";
+// this is a comment
+throw {'foo':'bar','sourceID':'fish'};
+ENDOFJAVASCRIPT
+is($error->line, 2, "...has right line number")
+  or diag Dumper $error;
+is($error->error->{foo},"bar", "...has values");
+
+$error = error_check { safari_js <<'ENDOFJAVASCRIPT'; } "CustomError", "object error again";
+throw {'foo':'bar','sourceID':'fish'};
+ENDOFJAVASCRIPT
+is($error->line, 1, "...has right line number");
+is($error->expressionBeginOffset, 0, "...has right begin offset");
+is($error->expressionEndOffset, 37, "...has end offset");
+
+
+
+$error = error_check {
+  safari_js "++++";
+} "SyntaxError","invalid js";
+is($error,"Parse error", "...is a parse error");
+
+# this checks our eval isn't easily broken by bad syntax
+$error = error_check {
   safari_js "{";
-} qr/Parse error/, "stray }";
+} "SyntaxError","stray }";
+is($error,"Parse error", "...is also a parse error");
+
+$error = error_check {
+  safari_js "return new Array(-1)";
+} "RangeError", "browser thrown error that isn't a syntax error";
+is($error,"Array size is not a small enough positive integer.","...has right error message");

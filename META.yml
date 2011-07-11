@@ -23,5 +23,7 @@ requires:
   Test::More: 0
   perl: 5.8.0
 resources:
+  homepage: http://github.com/2shortplanks/Mac-Safari-JavaScript/tree
   license: http://dev.perl.org/licenses/
-version: 1.00
+  repository: git://github.com/2shortplanks/Mac-Safari-JavaScript.git
+version: 1.01

@@ -8,14 +8,14 @@ use strict;
 use warnings;
 
 use Mac::AppleScript qw(RunAppleScript);
-use JSON::XS qw(decode_json);
+use JSON::XS;
 use Encode qw(encode decode);
 use Carp qw(croak);
 
 use Mac::Safari::JavaScript::Exception;
 
 our @EXPORT_OK;
-our $VERSION = "1.02";
+our $VERSION = "1.03";
 
 =head1 NAME
 
@@ -23,7 +23,7 @@ Mac::Safari::JavaScript - Run JavaScript in Safari on Mac OS X
 
 =head1 SYNOPSIS
 
-  use Mac::Safarai::JavaScript qw(safari_js);
+  use Mac::Safari::JavaScript qw(safari_js);
 
   # do an alert
   safari_js 'alert("Hello Safari User")';
@@ -199,7 +199,10 @@ ENDOFAPPLESCRIPT
   $json =~ s/\\\\/\\/gx;
 
   # and decode this from json
-  my $ds = $coder->decode($json);
+  my $ds = eval {
+    $coder->decode($json);
+  };
+  if ($@) { croak("Unexpected error returned when trying to communicate with Safari"); }
 
   return undef
     if exists $ds->{undefined};
@@ -209,7 +212,7 @@ ENDOFAPPLESCRIPT
     if exists $ds->{result};
   croak(Mac::Safari::JavaScript::Exception->new(%{ $ds }))
     if exists $ds->{error};
-  croak("Unexpected error");
+  croak("Unexpected error returned when trying to communicate with Safari");
 }
 push @EXPORT_OK, "safari_js";
 
